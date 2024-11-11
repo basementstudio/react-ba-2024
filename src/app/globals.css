@@ -19,3 +19,37 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+input[type="checkbox"] {
+  @apply appearance-none border-2 relative cursor-pointer;
+  @apply bg-black/10 border-[#39ff14];
+  box-shadow: 0 0 5px #39ff14;
+}
+
+input[type="checkbox"]:checked {
+  @apply bg-[#39ff14]/20;
+}
+
+input[type="checkbox"]:checked::before {
+  content: '';
+  @apply absolute inset-0.5;
+  @apply bg-[#39ff14];
+  box-shadow: 0 0 8px #39ff14;
+  animation: glow 1s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    filter: brightness(0.8);
+  }
+  to {
+    filter: brightness(1.2);
+  }
+}
+
+/* Optional: Add hover effect */
+input[type="checkbox"]:hover {
+  @apply border-[#39ff14]/50;
+  box-shadow: 0 0 10px #39ff14;
+}
+
