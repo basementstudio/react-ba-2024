@@ -41,7 +41,7 @@ export default function Page() {
           publicApiKey={process.env.NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_API_KEY!}
         >
           <RoomProvider
-            id="checkboxes-example-ad2"
+            id="checkbox-grid-example"
             initialStorage={getInitialStorage()}
             initialPresence={{
               cursor: null,
