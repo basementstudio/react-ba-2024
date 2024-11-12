@@ -70,8 +70,10 @@ export default function WebRTCExample() {
   };
 
   const getQRUrl = () => {
-    const baseUrl = "https://react-ba-2024.vercel.app/webrtc";
-    return `${baseUrl}?connect=${peerId}`;
+    //const baseUrl = "https://react-ba-2024.vercel.app/webrtc"; //https://react-ba-2024.vercel.app/webrtc
+    //return `${baseUrl}?connect=${peerId}`;
+
+    return peerId;
   };
 
   useEffect(() => {
