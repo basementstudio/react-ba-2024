@@ -88,7 +88,7 @@ export const ControlView = ({
       {!permission && (
         <button
           onClick={askForPermission}
-          className="w-full border-2 border-green-500 p-2 text-sm uppercase tracking-wider transition-colors"
+          className="w-full border-2 select-none border-green-500 p-2 text-sm uppercase tracking-wider transition-colors"
         >
           &gt; INITIALIZE SENSORS_
         </button>
@@ -97,7 +97,7 @@ export const ControlView = ({
         onClick={() => {
           setResetDevice(true);
         }}
-        className="w-full border-2 border-red-500 p-2 text-sm uppercase tracking-wider transition-colors"
+        className="w-full border-2 select-none border-red-500 p-2 text-sm uppercase tracking-wider transition-colors"
       >
         &gt; RESET TARGET_
       </button>
@@ -165,7 +165,7 @@ export const ControlView = ({
           <button
             key={button}
             className={clsx(
-              "border-2 border-green-500 p-4 text-xl font-bold transition-all active:scale-95",
+              "border-2 border-green-500 select-none p-4 text-xl font-bold transition-all active:scale-95",
               controls?.[button.toLowerCase()] && "bg-green-500 text-black",
             )}
             onTouchStart={() => setControl(button.toLowerCase())(true)}
