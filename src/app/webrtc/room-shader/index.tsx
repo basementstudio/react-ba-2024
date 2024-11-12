@@ -239,7 +239,7 @@ const Enemy = ({ position, id }: EnemyProps) => {
   });
 
   const removeEnemy = roomShaderStore((state) => state.removeEnemy);
-
+  const addExplosion = roomShaderStore((state) => state.addExplosion);
   return (
     <>
       <group ref={groupRef}>
@@ -263,6 +263,10 @@ const Enemy = ({ position, id }: EnemyProps) => {
         active
         onIntersect={() => {
           removeEnemy(id);
+          addExplosion({
+            id: v4(),
+            position: positionRef.current.toArray(),
+          });
         }}
         rotation={rotationRef.current}
         position={positionRef.current}
@@ -275,57 +279,87 @@ const Enemy = ({ position, id }: EnemyProps) => {
 const EXPLOSION_PARTICLES = 15;
 const PARTICLE_GEOMETRY = new THREE.SphereGeometry(0.05, 4, 4);
 const PARTICLE_MATERIAL = new THREE.MeshBasicMaterial({
-  color: "#ff5555",
+  color: "#00ff00",
   wireframe: false,
 });
 
-const Explosion = ({ position }: { position: [number, number, number] }) => {
-  const [particles, setParticles] = useState(() =>
+interface ExplosionProps {
+  position: [number, number, number];
+  id: string;
+}
+
+const Explosion = ({ position, id }: ExplosionProps) => {
+  const [particles] = useState(() =>
     Array.from({ length: EXPLOSION_PARTICLES }, () => ({
-      position: [...position],
+      position,
       velocity: [
         (Math.random() - 0.5) * 4,
         (Math.random() - 0.5) * 4,
         (Math.random() - 0.5) * 4,
-      ],
+      ] as [number, number, number],
       rotation: [
         Math.random() * Math.PI,
         Math.random() * Math.PI,
         Math.random() * Math.PI,
-      ],
+      ] as [number, number, number],
     }))
   );
 
-  useFrame((state, delta) => {
-    setParticles((prev) =>
-      prev.map((particle) => ({
-        ...particle,
-        position: [
-          particle.position[0] + particle.velocity[0] * delta,
-          particle.position[1] + particle.velocity[1] * delta,
-          particle.position[2] + particle.velocity[2] * delta,
-        ],
-        rotation: [
-          particle.rotation[0] + delta * 2,
-          particle.rotation[1] + delta * 2,
-          particle.rotation[2] + delta * 2,
-        ],
-      }))
-    );
-  });
+  const removeExplosion = roomShaderStore((state) => state.removeExplosion);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      removeExplosion(id);
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [removeExplosion, id]);
 
   return (
     <>
       {particles.map((particle, i) => (
-        <mesh
-          key={i}
-          geometry={PARTICLE_GEOMETRY}
-          material={PARTICLE_MATERIAL}
-          position={particle.position as any}
-          rotation={particle.rotation as any}
-        />
+        <ExplosionParticle key={i} {...particle} />
       ))}
     </>
+  );
+};
+
+interface ExplosionParticleProps {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  velocity: [number, number, number];
+}
+
+const ExplosionParticle = ({
+  position,
+  rotation,
+  velocity,
+}: ExplosionParticleProps) => {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+  const groupRef = useRef<THREE.Group | null>(null);
+
+  useFrame((_state, delta) => {
+    if (!meshRef.current) return;
+    if (!groupRef.current) return;
+
+    groupRef.current.position.x += velocity[0] * delta;
+    groupRef.current.position.y += velocity[1] * delta;
+    groupRef.current.position.z += velocity[2] * delta;
+
+    meshRef.current.rotation.x += delta * 2;
+    meshRef.current.rotation.y += delta * 2;
+    meshRef.current.rotation.z += delta * 2;
+  });
+
+  return (
+    <group ref={groupRef} position={position as any}>
+      <mesh
+        rotation={rotation as any}
+        ref={meshRef}
+        geometry={PARTICLE_GEOMETRY}
+        material={PARTICLE_MATERIAL}
+      />
+    </group>
   );
 };
 
@@ -340,6 +374,11 @@ interface EnemyData {
   id: number;
 }
 
+interface ExplosionData {
+  position: [number, number, number];
+  id: string;
+}
+
 interface RoomShaderStore {
   lasers: LaserData[];
   addLaser: (laser: LaserData) => void;
@@ -347,6 +386,9 @@ interface RoomShaderStore {
   enemies: EnemyData[];
   addEnemy: (enemy: EnemyData) => void;
   removeEnemy: (id: number) => void;
+  explosions: ExplosionData[];
+  addExplosion: (explosion: ExplosionData) => void;
+  removeExplosion: (id: string) => void;
 }
 
 const roomShaderStore = create<RoomShaderStore>((set) => ({
@@ -360,19 +402,23 @@ const roomShaderStore = create<RoomShaderStore>((set) => ({
   removeEnemy: (id) => {
     set((state) => ({ enemies: state.enemies.filter((e) => e.id !== id) }));
   },
+  explosions: [],
+  addExplosion: (explosion) =>
+    set((state) => ({ explosions: [...state.explosions, explosion] })),
+  removeExplosion: (id) => {
+    set((state) => ({
+      explosions: state.explosions.filter((e) => e.id !== id),
+    }));
+  },
 }));
 
 export const RoomShader = ({ controls }: { controls: any }) => {
   const [realPosition, setRealPosition] = useState<[number, number]>([0, 0]);
   const lasers = roomShaderStore((state) => state.lasers);
   const addLaser = roomShaderStore((state) => state.addLaser);
-  const removeLaser = roomShaderStore((state) => state.removeLaser);
   const enemies = roomShaderStore((state) => state.enemies);
   const addEnemy = roomShaderStore((state) => state.addEnemy);
-  const removeEnemy = roomShaderStore((state) => state.removeEnemy);
-  const [explosions, setExplosions] = useState<
-    Array<{ position: [number, number, number]; id: number }>
-  >([]);
+  const explosions = roomShaderStore((state) => state.explosions);
 
   useEffect(() => {
     if (!controls) return;
@@ -449,7 +495,7 @@ export const RoomShader = ({ controls }: { controls: any }) => {
     return () => {
       clearInterval(spawnInterval);
     };
-  }, []);
+  }, [addEnemy]);
 
   return (
     <div className="absolute inset-0 w-full overflow-hidden rounded-lg border-4 border-neutral-800 bg-black shadow-lg shadow-green-900/20">
@@ -463,8 +509,8 @@ export const RoomShader = ({ controls }: { controls: any }) => {
         {enemies.map((enemy) => (
           <Enemy key={enemy.id} {...enemy} />
         ))}
-        {explosions.map((explosion, i) => (
-          <Explosion key={i} position={explosion.position} />
+        {explosions.map((explosion) => (
+          <Explosion key={explosion.id} {...explosion} />
         ))}
         <ambientLight intensity={0.2} />
         <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
