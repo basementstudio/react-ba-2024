@@ -30,6 +30,14 @@ export function Boxes() {
   );
 }
 
+/**
+ * checkboxes: [
+ *   { id: 0, checked: false },
+ *   { id: 1, checked: true },
+ *   { id: 2, checked: false },
+ * ]
+ */
+
 interface BoxProps {
   id: number;
   checked: boolean;
