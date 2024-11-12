@@ -434,7 +434,9 @@ export const RoomShader = ({ controls }: { controls: any }) => {
     const x = -(((controls?.gyroscope[0] + 180) % 360) - 180);
     const y = ((controls?.gyroscope[1] + 180) % 360) - 180;
 
-    setAngle([x, y]);
+    
+
+    setAngle([x * 2, y * 2]);
   }, [controls]);
 
   useEffect(() => {
