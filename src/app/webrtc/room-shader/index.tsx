@@ -12,6 +12,9 @@ import {
   leftRightMaterial,
   backgroundMaterial,
 } from "./utils";
+import { Sensor } from "./sensors";
+import { create } from "zustand";
+import { v4 } from "uuid";
 
 const meshes: (vp: { w: number; h: number }) => any[] = (vp) => [
   {
@@ -139,13 +142,16 @@ const Pointer = ({ position }: { position: [number, number] }) => {
 };
 
 interface LaserProps {
+  id: string;
   position: [number, number, number];
   velocity: [number, number, number];
 }
 
-const Laser = ({ position, velocity }: LaserProps) => {
+const Laser = ({ id, position, velocity }: LaserProps) => {
   const groupRef = useRef<THREE.Group | null>(null);
   const positionRef = useRef<THREE.Vector3>(new THREE.Vector3(...position));
+
+  const removeLaser = roomShaderStore((state) => state.removeLaser);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
@@ -154,6 +160,10 @@ const Laser = ({ position, velocity }: LaserProps) => {
     positionRef.current.y += velocity[1] * delta;
     positionRef.current.z += velocity[2] * delta;
 
+    if (positionRef.current.z < -10) {
+      removeLaser(id);
+    }
+
     groupRef.current.position.copy(positionRef.current);
   });
 
@@ -161,29 +171,35 @@ const Laser = ({ position, velocity }: LaserProps) => {
   const laserRadius = 0.01; // Made thinner
 
   return (
-    <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
-      {/* Core beam */}
-      <mesh>
-        <cylinderGeometry args={[laserRadius, laserRadius, laserLength, 8]} />
-        <meshBasicMaterial color="#ff0000" transparent={true} opacity={0.9} />
-      </mesh>
+    <>
+      <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
+        {/* Core beam */}
+        <mesh>
+          <cylinderGeometry args={[laserRadius, laserRadius, laserLength, 8]} />
+          <meshBasicMaterial color="#ff0000" transparent={true} opacity={0.9} />
+        </mesh>
 
-      {/* Outer glow */}
-      <mesh>
-        <cylinderGeometry
-          args={[laserRadius * 2, laserRadius * 2, laserLength, 8]}
+        {/* Outer glow */}
+        <mesh>
+          <cylinderGeometry
+            args={[laserRadius * 2, laserRadius * 2, laserLength, 8]}
+          />
+          <meshBasicMaterial color="#ff3333" transparent={true} opacity={0.3} />
+        </mesh>
+
+        {/* Front glow */}
+        <pointLight
+          color="#ff0000"
+          intensity={2}
+          distance={1}
+          position={[0, 0, -laserLength / 2]}
         />
-        <meshBasicMaterial color="#ff3333" transparent={true} opacity={0.3} />
-      </mesh>
-
-      {/* Front glow */}
-      <pointLight
-        color="#ff0000"
-        intensity={2}
-        distance={1}
-        position={[0, 0, -laserLength / 2]}
+      </group>
+      <Sensor
+        position={positionRef.current}
+        halfSize={[laserRadius, laserRadius, laserLength]}
       />
-    </group>
+    </>
   );
 };
 
@@ -203,6 +219,7 @@ interface EnemyProps {
 
 const Enemy = ({ position, id }: EnemyProps) => {
   const positionRef = useRef<THREE.Vector3>(new THREE.Vector3(...position));
+  const rotationRef = useRef<THREE.Euler>(new THREE.Euler(0, 0, 0));
   const groupRef = useRef<THREE.Group | null>(null);
 
   useFrame((state, delta) => {
@@ -217,26 +234,41 @@ const Enemy = ({ position, id }: EnemyProps) => {
     groupRef.current.rotation.x += delta * 1.5;
     groupRef.current.rotation.y += delta * 2;
     groupRef.current.rotation.z += delta;
+
+    rotationRef.current.copy(groupRef.current.rotation);
   });
 
+  const removeEnemy = roomShaderStore((state) => state.removeEnemy);
+
   return (
-    <group ref={groupRef}>
-      <mesh geometry={COCKPIT_GEOMETRY} material={SHIP_MATERIAL} />
-      <group rotation={[0, 0, 0]}>
-        <mesh
-          position={[0.3, 0, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-          geometry={WING_GEOMETRY}
-          material={SHIP_MATERIAL}
-        />
-        <mesh
-          position={[-0.3, 0, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-          geometry={WING_GEOMETRY}
-          material={SHIP_MATERIAL}
-        />
+    <>
+      <group ref={groupRef}>
+        <mesh geometry={COCKPIT_GEOMETRY} material={SHIP_MATERIAL} />
+        <group rotation={[0, 0, 0]}>
+          <mesh
+            position={[0.3, 0, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+            geometry={WING_GEOMETRY}
+            material={SHIP_MATERIAL}
+          />
+          <mesh
+            position={[-0.3, 0, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+            geometry={WING_GEOMETRY}
+            material={SHIP_MATERIAL}
+          />
+        </group>
       </group>
-    </group>
+      <Sensor
+        active
+        onIntersect={() => {
+          removeEnemy(id);
+        }}
+        rotation={rotationRef.current}
+        position={positionRef.current}
+        halfSize={[0.3, 0.3, 0.3]}
+      />
+    </>
   );
 };
 
@@ -297,18 +329,47 @@ const Explosion = ({ position }: { position: [number, number, number] }) => {
   );
 };
 
+interface LaserData {
+  position: [number, number, number];
+  velocity: [number, number, number];
+  id: string;
+}
+
+interface EnemyData {
+  position: [number, number, number];
+  id: number;
+}
+
+interface RoomShaderStore {
+  lasers: LaserData[];
+  addLaser: (laser: LaserData) => void;
+  removeLaser: (id: string) => void;
+  enemies: EnemyData[];
+  addEnemy: (enemy: EnemyData) => void;
+  removeEnemy: (id: number) => void;
+}
+
+const roomShaderStore = create<RoomShaderStore>((set) => ({
+  lasers: [],
+  addLaser: (laser) => set((state) => ({ lasers: [...state.lasers, laser] })),
+  removeLaser: (id) => {
+    set((state) => ({ lasers: state.lasers.filter((l) => l.id !== id) }));
+  },
+  enemies: [],
+  addEnemy: (enemy) => set((state) => ({ enemies: [...state.enemies, enemy] })),
+  removeEnemy: (id) => {
+    set((state) => ({ enemies: state.enemies.filter((e) => e.id !== id) }));
+  },
+}));
+
 export const RoomShader = ({ controls }: { controls: any }) => {
   const [realPosition, setRealPosition] = useState<[number, number]>([0, 0]);
-  const [lasers, setLasers] = useState<
-    Array<{
-      position: [number, number, number];
-      velocity: [number, number, number];
-      id: number;
-    }>
-  >([]);
-  const [enemies, setEnemies] = useState<
-    Array<{ position: [number, number, number]; id: number }>
-  >([]);
+  const lasers = roomShaderStore((state) => state.lasers);
+  const addLaser = roomShaderStore((state) => state.addLaser);
+  const removeLaser = roomShaderStore((state) => state.removeLaser);
+  const enemies = roomShaderStore((state) => state.enemies);
+  const addEnemy = roomShaderStore((state) => state.addEnemy);
+  const removeEnemy = roomShaderStore((state) => state.removeEnemy);
   const [explosions, setExplosions] = useState<
     Array<{ position: [number, number, number]; id: number }>
   >([]);
@@ -334,7 +395,11 @@ export const RoomShader = ({ controls }: { controls: any }) => {
     if (controls?.a) {
       const now = Date.now();
       if (now - lastShot > SHOT_COOLDOWN) {
-        const position = [realPosition[0], realPosition[1], 3];
+        const position = [realPosition[0], realPosition[1], 3] as [
+          number,
+          number,
+          number
+        ];
 
         // Calculate direction vector from pointer position
         const directionX = 0; // Scale down the effect
@@ -351,23 +416,17 @@ export const RoomShader = ({ controls }: { controls: any }) => {
           (directionX / length) * LASER_SPEED,
           (directionY / length) * LASER_SPEED,
           (directionZ / length) * LASER_SPEED,
-        ];
+        ] as [number, number, number];
 
-        setLasers(
-          (prev) =>
-            [
-              ...prev,
-              {
-                position,
-                velocity,
-                createdAt: now,
-              },
-            ] as any
-        );
+        addLaser({
+          position,
+          velocity,
+          id: v4(),
+        });
         lastShot = now;
       }
     }
-  }, [controls, realPosition]);
+  }, [controls, realPosition, addLaser]);
 
   useEffect(() => {
     const SPAWN_INTERVAL = 2000; // Spawn every 2 seconds
@@ -378,13 +437,10 @@ export const RoomShader = ({ controls }: { controls: any }) => {
       const y = (Math.random() - 0.5) * 5;
       const z = -10; // Start far back
 
-      setEnemies((prev) => [
-        ...prev,
-        {
-          position: [x, y, z],
-          id: Date.now(),
-        },
-      ]);
+      addEnemy({
+        position: [x, y, z],
+        id: Date.now(),
+      });
     };
 
     // Spawn enemies periodically
@@ -401,11 +457,11 @@ export const RoomShader = ({ controls }: { controls: any }) => {
 
       <Canvas dpr={1} flat gl={{ toneMapping: THREE.NoToneMapping }}>
         <Walls />
-        {lasers.map((laser, i) => (
-          <Laser key={i} position={laser.position} velocity={laser.velocity} />
+        {lasers.map((laser) => (
+          <Laser key={laser.id} {...laser} />
         ))}
-        {enemies.map((enemy, i) => (
-          <Enemy key={i} position={enemy.position} id={enemy.id} />
+        {enemies.map((enemy) => (
+          <Enemy key={enemy.id} {...enemy} />
         ))}
         {explosions.map((explosion, i) => (
           <Explosion key={i} position={explosion.position} />
