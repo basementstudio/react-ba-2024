@@ -167,7 +167,7 @@ const Laser = ({ id, position, velocity }: LaserProps) => {
     groupRef.current.position.copy(positionRef.current);
   });
 
-  const laserLength = 2; // Made longer
+  const laserLength = 1; // Made longer
   const laserRadius = 0.01; // Made thinner
 
   useEffect(() => {
