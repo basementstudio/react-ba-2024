@@ -161,7 +161,7 @@ const Laser = ({ position, velocity }: LaserProps) => {
   const laserRadius = 0.01; // Made thinner
 
   return (
-    <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]} position={position}>
+    <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
       {/* Core beam */}
       <mesh>
         <cylinderGeometry args={[laserRadius, laserRadius, laserLength, 8]} />
@@ -202,27 +202,25 @@ interface EnemyProps {
 }
 
 const Enemy = ({ position, id }: EnemyProps) => {
-  const [currentPosition, setCurrentPosition] = useState(position);
-  const [rotation, setRotation] = useState([0, Math.PI, 0]);
+  const positionRef = useRef<THREE.Vector3>(new THREE.Vector3(...position));
+  const groupRef = useRef<THREE.Group | null>(null);
 
   useFrame((state, delta) => {
-    // Add slight position movement
-    setCurrentPosition((prev) => [
-      prev[0] + Math.sin(state.clock.elapsedTime + id) * delta * 0.5,
-      prev[1],
-      prev[2] + delta * 2,
-    ]);
+    if (!groupRef.current) return;
 
-    // Add rotation
-    setRotation((prev) => [
-      prev[0] + delta * 1.5, // X axis rotation
-      prev[1] + delta * 2, // Y axis rotation
-      prev[2] + delta, // Z axis rotation
-    ]);
+    positionRef.current.x +=
+      Math.sin(state.clock.elapsedTime + id) * delta * 0.5;
+    positionRef.current.z += delta * 2;
+
+    groupRef.current.position.copy(positionRef.current);
+
+    groupRef.current.rotation.x += delta * 1.5;
+    groupRef.current.rotation.y += delta * 2;
+    groupRef.current.rotation.z += delta;
   });
 
   return (
-    <group position={currentPosition} rotation={rotation as any}>
+    <group ref={groupRef}>
       <mesh geometry={COCKPIT_GEOMETRY} material={SHIP_MATERIAL} />
       <group rotation={[0, 0, 0]}>
         <mesh
