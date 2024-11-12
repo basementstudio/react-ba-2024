@@ -24,12 +24,24 @@ export function Boxes() {
   return (
     <BoxContainer>
       {staticBoxes.map((box) => (
-        <Box key={box.id} />
+        <Box key={box.id} id={box.id} checked={box.checked} />
       ))}
     </BoxContainer>
   );
 }
 
-function Box() {
-  return <input className="aspect-square relative" type="checkbox" />;
+interface BoxProps {
+  id: number;
+  checked: boolean;
+}
+
+function Box({ id, checked }: BoxProps) {
+  return (
+    <input
+      className="aspect-square relative"
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => e.target.checked}
+    />
+  );
 }
