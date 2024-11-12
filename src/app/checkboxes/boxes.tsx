@@ -3,6 +3,16 @@
 import { BoxContainer } from "./box-container";
 import { CHECKBOXES_TOTAL } from "./constants";
 
+/**
+ * store: {
+ *   checkboxes: [
+ *     { id: 0, checked: false },
+ *     { id: 1, checked: true },
+ *     { id: 2, checked: false },
+ *   ]
+ * }
+ */
+
 const staticBoxes = Array(CHECKBOXES_TOTAL)
   .fill(null)
   .map((_, i) => ({
