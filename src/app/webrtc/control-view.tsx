@@ -28,7 +28,7 @@ export const ControlView = ({
         return { ...controls, [targetControl]: value };
       });
     },
-    [setControls],
+    [setControls]
   );
 
   const movement = (event: any) => {
@@ -43,7 +43,7 @@ export const ControlView = ({
     (event: any) => {
       setControl("gyroscope")([event.alpha, event.beta, event.gamma]);
     },
-    [setControl],
+    [setControl]
   );
 
   const askForPermission = () => {
@@ -139,7 +139,10 @@ export const ControlView = ({
                 <div
                   className="h-full bg-green-500 opacity-50 transition-all"
                   style={{
-                    width: `${Math.min(Math.abs(controls?.acelerometer?.[index] || 0) * 10, 100)}%`,
+                    width: `${Math.min(
+                      Math.abs(controls?.acelerometer?.[index] || 0) * 10,
+                      100
+                    )}%`,
                   }}
                 />
                 <div className="absolute inset-0 grid grid-cols-10">
@@ -166,12 +169,12 @@ export const ControlView = ({
             key={button}
             className={clsx(
               "border-2 border-green-500 select-none p-4 text-xl font-bold transition-all active:scale-95",
-              controls?.[button.toLowerCase()] && "bg-green-500 text-black",
+              controls?.[button.toLowerCase()] && "bg-green-500 text-black"
             )}
             onTouchStart={() => setControl(button.toLowerCase())(true)}
             onTouchEnd={() => setControl(button.toLowerCase())(false)}
           >
-            [{button}_BTN]
+            <span className="pointer-events-none">[{button}_BTN]</span>
           </button>
         ))}
       </div>
