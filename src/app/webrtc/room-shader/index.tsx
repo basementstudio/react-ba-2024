@@ -1,6 +1,4 @@
-//@ts-nocheck
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { rgbaToVector3 } from "./utils";
@@ -55,7 +53,6 @@ const meshes: (vp: { w: number; h: number }) => any[] = (vp) => [
 const Walls = () => {
   const [camera, renderer] = useThree((state) => [state.camera, state.gl]);
   const [vp, setVp] = useState({ w: 0, h: 0 });
-  const [time, setTime] = useState(0);
 
   useEffect(() => {
     const handleResize = () => setVp(getCurrentViewport(camera, 48));
@@ -77,7 +74,7 @@ const Walls = () => {
     leftRightMaterial.uniforms.uLineColor.value = line;
 
     const handleResize = () => {
-      const ctx = renderer.getContext();
+      const ctx = (renderer as any).getContext();
       topBottomMaterial.uniforms.uSize.value = ctx.drawingBufferWidth;
       leftRightMaterial.uniforms.uSize.value = ctx.drawingBufferHeight;
     };
@@ -88,8 +85,8 @@ const Walls = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, [renderer]);
 
-  useFrame((state, delta) => {
-    setTime((prev) => prev + delta * 0.01);
+  useFrame((state) => {
+    const time = state.clock.elapsedTime * 0.01;
     topBottomMaterial.uniforms.uTime.value = time;
     leftRightMaterial.uniforms.uTime.value = time;
   });
@@ -103,12 +100,12 @@ const Walls = () => {
   );
 };
 
-const Pointer = ({ position }: { position: [number, number, number] }) => {
+const Pointer = ({ position }: { position: [number, number] }) => {
   const { camera, viewport } = useThree();
 
   useEffect(() => {
     const handleMouseDown = () => {
-      const vector = new THREE.Vector3(position[0], position[1], position[2])
+      const vector = new THREE.Vector3(position[0], position[1], 3)
         .sub(camera.position)
         .normalize()
         .multiplyScalar(20); // Throw velocity
@@ -141,22 +138,30 @@ const Pointer = ({ position }: { position: [number, number, number] }) => {
   );
 };
 
-const Laser = ({ position, velocity }) => {
-  const [currentPosition, setCurrentPosition] = useState(position);
+interface LaserProps {
+  position: [number, number, number];
+  velocity: [number, number, number];
+}
+
+const Laser = ({ position, velocity }: LaserProps) => {
+  const groupRef = useRef<THREE.Group | null>(null);
+  const positionRef = useRef<THREE.Vector3>(new THREE.Vector3(...position));
 
   useFrame((state, delta) => {
-    setCurrentPosition((prev) => [
-      prev[0] + velocity[0] * delta,
-      prev[1] + velocity[1] * delta,
-      prev[2] + velocity[2] * delta,
-    ]);
+    if (!groupRef.current) return;
+
+    positionRef.current.x += velocity[0] * delta;
+    positionRef.current.y += velocity[1] * delta;
+    positionRef.current.z += velocity[2] * delta;
+
+    groupRef.current.position.copy(positionRef.current);
   });
 
   const laserLength = 2; // Made longer
   const laserRadius = 0.01; // Made thinner
 
   return (
-    <group rotation={[Math.PI / 2, 0, 0]} position={currentPosition}>
+    <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]} position={position}>
       {/* Core beam */}
       <mesh>
         <cylinderGeometry args={[laserRadius, laserRadius, laserLength, 8]} />
@@ -191,7 +196,12 @@ const SHIP_MATERIAL = new THREE.MeshBasicMaterial({
   wireframe: true,
 });
 
-const Enemy = ({ position, id }) => {
+interface EnemyProps {
+  position: [number, number, number];
+  id: number;
+}
+
+const Enemy = ({ position, id }: EnemyProps) => {
   const [currentPosition, setCurrentPosition] = useState(position);
   const [rotation, setRotation] = useState([0, Math.PI, 0]);
 
@@ -212,7 +222,7 @@ const Enemy = ({ position, id }) => {
   });
 
   return (
-    <group position={currentPosition} rotation={rotation}>
+    <group position={currentPosition} rotation={rotation as any}>
       <mesh geometry={COCKPIT_GEOMETRY} material={SHIP_MATERIAL} />
       <group rotation={[0, 0, 0]}>
         <mesh
@@ -239,7 +249,7 @@ const PARTICLE_MATERIAL = new THREE.MeshBasicMaterial({
   wireframe: false,
 });
 
-const Explosion = ({ position }) => {
+const Explosion = ({ position }: { position: [number, number, number] }) => {
   const [particles, setParticles] = useState(() =>
     Array.from({ length: EXPLOSION_PARTICLES }, () => ({
       position: [...position],
@@ -281,8 +291,8 @@ const Explosion = ({ position }) => {
           key={i}
           geometry={PARTICLE_GEOMETRY}
           material={PARTICLE_MATERIAL}
-          position={particle.position}
-          rotation={particle.rotation}
+          position={particle.position as any}
+          rotation={particle.rotation as any}
         />
       ))}
     </>
@@ -290,15 +300,19 @@ const Explosion = ({ position }) => {
 };
 
 export const RoomShader = ({ controls }: { controls: any }) => {
-  const [realPosition, setRealPosition] = useState([0, 0]);
+  const [realPosition, setRealPosition] = useState<[number, number]>([0, 0]);
   const [lasers, setLasers] = useState<
-    Array<{ position: number[]; velocity: number[]; id: number }>
+    Array<{
+      position: [number, number, number];
+      velocity: [number, number, number];
+      id: number;
+    }>
   >([]);
   const [enemies, setEnemies] = useState<
-    Array<{ position: number[]; id: number }>
+    Array<{ position: [number, number, number]; id: number }>
   >([]);
   const [explosions, setExplosions] = useState<
-    Array<{ position: number[]; id: number }>
+    Array<{ position: [number, number, number]; id: number }>
   >([]);
 
   useEffect(() => {
@@ -341,14 +355,17 @@ export const RoomShader = ({ controls }: { controls: any }) => {
           (directionZ / length) * LASER_SPEED,
         ];
 
-        setLasers((prev) => [
-          ...prev,
-          {
-            position,
-            velocity,
-            createdAt: now,
-          },
-        ]);
+        setLasers(
+          (prev) =>
+            [
+              ...prev,
+              {
+                position,
+                velocity,
+                createdAt: now,
+              },
+            ] as any
+        );
         lastShot = now;
       }
     }
