@@ -66,7 +66,7 @@ function Cursor({ connectionId, color, width, height }: CursorProps) {
       style={{
         transform: `translateX(${x * width}px) translateY(${y * height}px)`,
       }}
-      className="absolute left-0 top-0 w-8"
+      className="absolute left-0 top-0 w-8 transition-transform duration-[50]"
       viewBox="0 0 24 36"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -75,7 +75,7 @@ function Cursor({ connectionId, color, width, height }: CursorProps) {
         d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z"
         fill={color}
         stroke="black"
-        strokeWidth="4"
+        strokeWidth="6"
         strokeLinejoin="round"
         strokeLinecap="round"
         paintOrder="stroke fill"
