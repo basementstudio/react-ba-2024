@@ -84,7 +84,7 @@ export const ControlView = ({
   }, [resetDevice]);
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border-2 border-green-500 bg-black p-4 font-mono text-green-500 shadow-[0_0_10px_rgba(0,255,0,0.3)]">
+    <div className="select-none flex flex-col gap-4 rounded-lg border-2 border-green-500 bg-black p-4 font-mono text-green-500 shadow-[0_0_10px_rgba(0,255,0,0.3)]">
       {!permission && (
         <button
           onClick={askForPermission}
