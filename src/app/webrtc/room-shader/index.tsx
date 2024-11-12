@@ -118,9 +118,9 @@ const Pointer = ({ position }: { position: [number, number] }) => {
     return () => window.removeEventListener("mousedown", handleMouseDown);
   }, [camera, position]);
 
-  const length = 0.02; // Length of cross lines
-  const thickness = 0.005; // Thickness of cross lines
-  const color = "#00ff00"; // Changed to bright green to match the theme
+  const length = 0.05;
+  const thickness = 0.01;
+  const color = "#00ff00";
 
   return (
     <>
@@ -170,17 +170,25 @@ const Laser = ({ id, position, velocity }: LaserProps) => {
   const laserLength = 2; // Made longer
   const laserRadius = 0.01; // Made thinner
 
+  useEffect(() => {
+    if (groupRef.current) {
+      groupRef.current.lookAt(
+        groupRef.current.position.clone().add(new THREE.Vector3(...velocity))
+      );
+    }
+  }, []);
+
   return (
     <>
-      <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
+      <group ref={groupRef}>
         {/* Core beam */}
-        <mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[laserRadius, laserRadius, laserLength, 8]} />
           <meshBasicMaterial color="#ff0000" transparent={true} opacity={0.9} />
         </mesh>
 
         {/* Outer glow */}
-        <mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry
             args={[laserRadius * 2, laserRadius * 2, laserLength, 8]}
           />
@@ -413,7 +421,7 @@ const roomShaderStore = create<RoomShaderStore>((set) => ({
 }));
 
 export const RoomShader = ({ controls }: { controls: any }) => {
-  const [realPosition, setRealPosition] = useState<[number, number]>([0, 0]);
+  const [angle, setAngle] = useState<[number, number]>([0, 0]);
   const lasers = roomShaderStore((state) => state.lasers);
   const addLaser = roomShaderStore((state) => state.addLaser);
   const enemies = roomShaderStore((state) => state.enemies);
@@ -426,12 +434,7 @@ export const RoomShader = ({ controls }: { controls: any }) => {
     const x = -(((controls?.gyroscope[0] + 180) % 360) - 180);
     const y = ((controls?.gyroscope[1] + 180) % 360) - 180;
 
-    const size = 24;
-
-    const x1 = (x / size) * 2; // Remap from -180 to 1
-    const y1 = (y / size) * 2; // Remap from -180 to 1
-
-    setRealPosition([x1, y1]);
+    setAngle([x, y]);
   }, [controls]);
 
   useEffect(() => {
@@ -441,28 +444,26 @@ export const RoomShader = ({ controls }: { controls: any }) => {
     if (controls?.a) {
       const now = Date.now();
       if (now - lastShot > SHOT_COOLDOWN) {
-        const position = [realPosition[0], realPosition[1], 3] as [
-          number,
-          number,
-          number
-        ];
+        const xRad = (angle[0] * Math.PI) / 180;
+        const yRad = (angle[1] * Math.PI) / 180;
 
-        // Calculate direction vector from pointer position
-        const directionX = 0; // Scale down the effect
-        const directionY = 0;
-        const directionZ = -1; // Forward direction
+        const directionX = Math.sin(xRad) * Math.cos(yRad);
+        const directionY = Math.sin(yRad + 0.1);
+        const directionZ = -Math.cos(xRad) * Math.cos(yRad);
 
-        // Normalize the direction vector
         const length = Math.sqrt(
           directionX * directionX +
             directionY * directionY +
             directionZ * directionZ
         );
+
         const velocity = [
           (directionX / length) * LASER_SPEED,
           (directionY / length) * LASER_SPEED,
           (directionZ / length) * LASER_SPEED,
         ] as [number, number, number];
+
+        const position = [0, -1, 3] as [number, number, number];
 
         addLaser({
           position,
@@ -472,7 +473,7 @@ export const RoomShader = ({ controls }: { controls: any }) => {
         lastShot = now;
       }
     }
-  }, [controls, realPosition, addLaser]);
+  }, [controls, angle, addLaser]);
 
   useEffect(() => {
     const SPAWN_INTERVAL = 2000; // Spawn every 2 seconds
@@ -516,7 +517,12 @@ export const RoomShader = ({ controls }: { controls: any }) => {
         <directionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
         <pointLight position={[-5, 3, 0]} intensity={0.4} color="#00ff00" />
         <pointLight position={[0, -2, -10]} intensity={0.3} color="#00ff00" />
-        <Pointer position={realPosition} />
+        <Pointer
+          position={[
+            Math.sin((angle[0] * Math.PI) / 180) * 2,
+            Math.sin((angle[1] * Math.PI) / 180) * 2,
+          ]}
+        />
       </Canvas>
     </div>
   );
