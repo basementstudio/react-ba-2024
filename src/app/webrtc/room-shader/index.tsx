@@ -229,6 +229,8 @@ const Enemy = ({ position, id }: EnemyProps) => {
   const positionRef = useRef<THREE.Vector3>(new THREE.Vector3(...position));
   const rotationRef = useRef<THREE.Euler>(new THREE.Euler(0, 0, 0));
   const groupRef = useRef<THREE.Group | null>(null);
+  const removeEnemy = roomShaderStore((state) => state.removeEnemy);
+  const addExplosion = roomShaderStore((state) => state.addExplosion);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
@@ -244,10 +246,12 @@ const Enemy = ({ position, id }: EnemyProps) => {
     groupRef.current.rotation.z += delta;
 
     rotationRef.current.copy(groupRef.current.rotation);
+
+    if (positionRef.current.z > 10) {
+      removeEnemy(id);
+    }
   });
 
-  const removeEnemy = roomShaderStore((state) => state.removeEnemy);
-  const addExplosion = roomShaderStore((state) => state.addExplosion);
   return (
     <>
       <group ref={groupRef}>
@@ -433,8 +437,6 @@ export const RoomShader = ({ controls }: { controls: any }) => {
 
     const x = -(((controls?.gyroscope[0] + 180) % 360) - 180);
     const y = ((controls?.gyroscope[1] + 180) % 360) - 180;
-
-    
 
     setAngle([x * 2, y * 2]);
   }, [controls]);
